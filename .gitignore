@@ -1,0 +1,14 @@
+/target
+/tmp
+/venv
+
+/bin/**
+!/bin/.keep
+
+/gramine-build/*.token
+/gramine-build/*.sig
+/gramine-build/*.manifest.sgx
+/gramine-build/*.manifest
+
+/gramine-build/dcap-test.o
+/gramine-build/dcap-test
