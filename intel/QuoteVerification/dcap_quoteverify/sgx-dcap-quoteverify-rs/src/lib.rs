@@ -46,43 +46,6 @@ pub use qvl_sys::sgx_ql_qv_result_t;
 pub use qvl_sys::sgx_ql_qe_report_info_t;
 pub use qvl_sys::sgx_qv_path_type_t;
 
-
-/// When the Quoting Verification Library is linked to a process, it needs to know the proper enclave loading policy.
-/// The library may be linked with a long lived process, such as a service, where it can load the enclaves and leave
-/// them loaded (persistent). This better ensures that the enclaves will be available upon quote requests and not subject
-/// to EPC limitations if loaded on demand. However, if the Quoting library is linked with an application process, there
-/// may be many applications with the Quoting library and a better utilization of EPC is to load and unloaded the quoting
-/// enclaves on demand (ephemeral).  The library will be shipped with a default policy of loading enclaves and leaving
-/// them loaded until the library is unloaded (PERSISTENT). If the policy is set to EPHEMERAL, then the QE and PCE will
-/// be loaded and unloaded on-demand.  If either enclave is already loaded when the policy is change to EPHEMERAL, the
-/// enclaves will be unloaded before returning.
-///
-/// # Param
-/// - **policy**\
-/// Sets the requested enclave loading policy to either *SGX_QL_PERSISTENT*, *SGX_QL_EPHEMERAL*
-/// or *SGX_QL_DEFAULT*.
-///
-/// # Return
-/// - ***SGX_QL_SUCCESS***\
-/// Successfully set the enclave loading policy for the quoting library's enclaves.\
-/// - ***SGX_QL_UNSUPPORTED_LOADING_POLICY***\
-/// The selected policy is not support by the quoting library.\
-/// - ***SGX_QL_ERROR_UNEXPECTED***\
-/// Unexpected internal error.
-///
-/// # Examples
-/// ```
-/// use sgx_dcap_quoteverify_rs::*;
-/// 
-/// let policy = sgx_ql_request_policy_t::SGX_QL_DEFAULT;
-/// let ret = sgx_qv_set_enclave_load_policy(policy);
-/// 
-/// assert_eq!(ret, quote3_error_t::SGX_QL_SUCCESS);
-/// ```
-pub fn sgx_qv_set_enclave_load_policy(policy: sgx_ql_request_policy_t) -> quote3_error_t {
-    unsafe {qvl_sys::sgx_qv_set_enclave_load_policy(policy)}
-}
-
 /// Get SGX supplemental data required size.
 ///
 /// # Param

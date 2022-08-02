@@ -31,13 +31,13 @@
 SGX_LIBRARY_PATH := $(SGX_SDK)/lib64
 
 App_Cpp_Files := App/App.cpp
-App_Include_Paths := -IApp -I$(SGX_SDK)/include
+App_Include_Paths := -IApp -I$(SGX_SDK)/include -I../../intel/QuoteVerification/dcap_quoteverify/inc
 
 App_C_Flags := -fPIC -Wno-attributes $(App_Include_Paths)
 App_C_Flags += -DNDEBUG -UEDEBUG -UDEBUG
 
 App_Cpp_Flags := $(App_C_Flags)
-App_Link_Flags := -L$(SGX_LIBRARY_PATH) -lsgx_dcap_quoteverify
+App_Link_Flags := -L$(SGX_LIBRARY_PATH) -L. -lsgx_dcap_quoteverify
 
 App_Cpp_Objects := $(App_Cpp_Files:.cpp=.o)
 
@@ -58,4 +58,4 @@ $(App_Name): $(App_Cpp_Objects)
 .PHONY: clean
 
 clean:
-	@rm -f .config_* $(App_Name) $(Enclave_Name) $(Signed_Enclave_Name) $(App_Cpp_Objects) App/*_u.* $(Enclave_Cpp_Objects) Enclave/Enclave_t.*
+	@rm -f .config_* $(App_Name) $(App_Cpp_Objects)

@@ -33,8 +33,6 @@
 #include <stdio.h>
 #include <vector>
 #include <cstring>
-#include <string>
-#include <assert.h>
 #include <fstream>
 #include "sgx_ql_quote.h"
 #include "sgx_dcap_quoteverify.h"
@@ -81,11 +79,11 @@ vector<uint8_t> readBinaryContent(const string& filePath)
 
 int ecdsa_quote_verification(vector<uint8_t> quote)
 {
-    int ret = 0;
-    time_t current_time = 0;
+    int ret;
+    time_t current_time;
+    quote3_error_t dcap_ret;
     uint32_t supplemental_data_size = 0;
     uint8_t *p_supplemental_data = NULL;
-    quote3_error_t dcap_ret = SGX_QL_ERROR_UNEXPECTED;
     sgx_ql_qv_result_t quote_verification_result = SGX_QL_QV_RESULT_UNSPECIFIED;
     uint32_t collateral_expiration_status = 1;
 

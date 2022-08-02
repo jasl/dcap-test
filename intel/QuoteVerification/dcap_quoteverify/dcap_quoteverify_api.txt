@@ -99,20 +99,6 @@ Parameters:
 quote3_error_t sgx_qv_get_quote_supplemental_data_size(
     uint32_t *p_data_size);
 
-
-/**
-Parameters:
-    policy [In]
-        Set QvE load policy. Possible values:
-            SGX_QL_PERSISTENT, ///< QvE is initialized on first use and reused until process ends.
-            SGX_QL_EPHEMERAL,  ///< QvE is initialized and terminated on every verification.
-                               ///< If a previous QvE exists, it is stopped & restarted before verification.
-            SGX_QL_DEFAULT = SGX_QL_PERSISTENT
-.
-*/
-quote3_error_t sgx_qv_set_enclave_load_policy(sgx_ql_request_policy_t policy);
-
-
 /**
 Parameters:
     path_type [In]
