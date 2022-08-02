@@ -7,5 +7,6 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
+sgx-dcap-quoteverify-rs = { path = "vendor/sgx-dcap-quoteverify-rs"}
 
 hex = "*"

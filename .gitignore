@@ -12,3 +12,6 @@
 
 /gramine-build/dcap-test.o
 /gramine-build/dcap-test
+
+/cmake-build-debug
+/CMakeLists.txt
