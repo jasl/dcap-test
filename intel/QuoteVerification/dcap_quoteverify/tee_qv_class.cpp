@@ -38,11 +38,7 @@
 #include "sgx_dcap_qv_internal.h"
 #include "sgx_dcap_pcs_com.h"
 #include "se_trace.h"
-#ifndef _MSC_VER
 #include "linux/qve_u.h"
-#else //_MSC_VER
-#include "win/qve_u.h"
-#endif //_MSC_VER
 
 //SGX untrusted quote verification
 //
