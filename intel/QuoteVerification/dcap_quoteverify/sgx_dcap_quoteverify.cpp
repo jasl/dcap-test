@@ -349,39 +349,6 @@ quote3_error_t tee_verify_evidence(
 }
 
 /**
- * Get SGX QvE identity and Root CA CRL
- **/
-quote3_error_t sgx_qv_get_qve_identity(
-         uint8_t **pp_qveid,
-         uint32_t *p_qveid_size,
-         uint8_t **pp_qveid_issue_chain,
-         uint32_t *p_qveid_issue_chain_size,
-         uint8_t **pp_root_ca_crl,
-         uint16_t *p_root_ca_crl_size) {
-
-    return sgx_dcap_retrieve_qve_identity(pp_qveid,
-                                          p_qveid_size,
-                                          pp_qveid_issue_chain,
-                                          p_qveid_issue_chain_size,
-                                          pp_root_ca_crl,
-                                          p_root_ca_crl_size);
-}
-
-
-/**
- * Free SGX QvE identity and Root CA CRL
- **/
-quote3_error_t sgx_qv_free_qve_identity(
-        uint8_t *p_qveid,
-        uint8_t *p_qveid_issue_chain,
-        uint8_t *p_root_ca_crl) {
-
-    return sgx_dcap_free_qve_identity(p_qveid,
-                                      p_qveid_issue_chain,
-                                      p_root_ca_crl);
-}
-
-/**
  * Get SGX supplemental data required size.
  **/
 quote3_error_t sgx_qv_get_quote_supplemental_data_size(uint32_t *p_data_size)
