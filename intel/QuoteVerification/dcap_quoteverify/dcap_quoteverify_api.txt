@@ -98,20 +98,3 @@ Parameters:
 */
 quote3_error_t sgx_qv_get_quote_supplemental_data_size(
     uint32_t *p_data_size);
-
-/**
-Parameters:
-    path_type [In]
-        Set path type. Possible values:
-            SGX_QV_QVE_PATH, ///< Set the full path of QvE
-            SGX_QV_QPL_PATH,  ///< Set the full path of QPL
-    p_path [In]
-        Null terminated string of the full path
-
-Return Values:
-    SGX_QL_SUCCESS:
-        Successfully evaluated the quote.
-    SGX_QL_ERROR_INVALID_PARAMETER:
-        The parameter is incorrect.
-*/
- quote3_error_t sgx_qv_set_path(sgx_qv_path_type_t path_type, const char *p_path)

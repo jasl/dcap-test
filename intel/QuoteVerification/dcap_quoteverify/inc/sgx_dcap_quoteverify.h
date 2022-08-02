@@ -129,20 +129,6 @@ quote3_error_t sgx_qv_free_qve_identity(uint8_t *p_qveid,
                                         uint8_t *p_qveid_issue_chain,
                                         uint8_t *p_root_ca_crl);
 
-
-#ifndef _MSC_VER
-typedef enum
-{
-    SGX_QV_QVE_PATH,
-    SGX_QV_QPL_PATH
-} sgx_qv_path_type_t;
-
-quote3_error_t sgx_qv_set_path(sgx_qv_path_type_t path_type,
-                                   const char *p_path);
-#endif
-
-
-
 /**
  * Get TDX supplemental data required size.
  * @param p_data_size[OUT] - Pointer to hold the size of the buffer in bytes required to contain all of the supplemental data.

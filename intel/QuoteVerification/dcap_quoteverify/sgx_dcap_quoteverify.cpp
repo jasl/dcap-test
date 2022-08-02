@@ -118,15 +118,9 @@ extern "C" int sgx_thread_set_multiple_untrusted_events_ocall(const void **waite
 }
 
 
-#if defined(_MSC_VER)
-#include <tchar.h>
-bool get_qve_path(TCHAR *p_file_path, size_t buf_size);
-#else
 #include <limits.h>
 #define MAX_PATH PATH_MAX
 bool get_qve_path(char *p_file_path, size_t buf_size);
-
-#endif
 
 #ifdef __GNUC__
 pthread_create_ocall_func_t p_pthread_create_ocall = NULL;
@@ -454,55 +448,3 @@ quote3_error_t tdx_qv_verify_quote(
         supplemental_data_size,
         p_supplemental_data);
 }
-
-#ifndef _MSC_VER
-
-#include <sys/types.h>
-#include <sys/stat.h>
-
-
-/**
- * This API can be used to set the full path of QVE and QPL library.
- *
- * The function takes the enum and the corresponding full path.
- *
- * @param path_type The type of binary being passed in.
- * @param p_path It should be a valid full path.
- *
- * @return SGX_QL_SUCCESS  Successfully set the full path.
- * @return SGX_QL_ERROR_INVALID_PARAMETER p_path is not a valid full path or the path is too long.
- */
-
-quote3_error_t sgx_qv_set_path(
-        sgx_qv_path_type_t path_type,
-        const char *p_path)
-{
-    quote3_error_t ret = SGX_QL_SUCCESS;
-    bool temp_ret = false;
-    struct stat info;
-
-    if (!p_path)
-        return(SGX_QL_ERROR_INVALID_PARAMETER);
-
-    if(stat(p_path, &info) != 0)
-        return(SGX_QL_ERROR_INVALID_PARAMETER);
-    else if((info.st_mode & S_IFREG) == 0)
-        return(SGX_QL_ERROR_INVALID_PARAMETER);
-
-    switch(path_type)
-    {
-        case SGX_QV_QVE_PATH:
-            temp_ret = sgx_qv_set_qve_path(p_path);
-            ret = temp_ret ? SGX_QL_SUCCESS : SGX_QL_ERROR_INVALID_PARAMETER;
-            break;
-        case SGX_QV_QPL_PATH:
-            temp_ret = sgx_qv_set_qpl_path(p_path);
-            ret = temp_ret ? SGX_QL_SUCCESS : SGX_QL_ERROR_INVALID_PARAMETER;
-            break;
-    default:
-        ret = SGX_QL_ERROR_INVALID_PARAMETER;
-        break;
-    }
-    return(ret);
-}
-#endif

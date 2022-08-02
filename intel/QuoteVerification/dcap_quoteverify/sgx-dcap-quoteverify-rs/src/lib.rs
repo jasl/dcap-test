@@ -243,23 +243,3 @@ pub fn tdx_qv_verify_quote(
             p_supplemental_data)
     }
 }
-
-/// Set the full path of QVE and QPL library.
-/// The function takes the enum and the corresponding full path.
-///
-/// # Param
-/// - **path_type**\
-/// The type of binary being passed in.
-/// - **p_path**\
-/// It should be a valid full path.
-///
-/// # Return
-/// - ***SGX_QL_SUCCESS***\
-/// Successfully set the full path.
-/// - ***SGX_QL_ERROR_INVALID_PARAMETER***\
-/// p_path is not a valid full path or the path is too long.
-///
-#[cfg(target_os = "linux")]
-pub fn sgx_qv_set_path(path_type: sgx_qv_path_type_t,  p_path: CString) -> quote3_error_t {
-    unsafe {qvl_sys::sgx_qv_set_path(path_type, p_path.as_ptr())}
-}
