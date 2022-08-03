@@ -79,19 +79,6 @@ public:
     virtual quote3_error_t tee_free_verification_endorsement(
         struct _sgx_ql_qve_collateral_t *pp_quote_collateral) = 0;
 
-    virtual quote3_error_t tee_get_qve_identity(
-        uint8_t **pp_qveid,
-        uint32_t *p_qveid_size,
-        uint8_t **pp_qveid_issue_chain,
-        uint32_t *p_qveid_issue_chain_size,
-        uint8_t **pp_root_ca_crl,
-        uint16_t *p_root_ca_crl_size) = 0;
-
-    virtual quote3_error_t tee_free_qve_identity(
-        uint8_t *p_qveid,
-        uint8_t *p_qveid_issue_chain,
-        uint8_t *p_root_ca_crl) = 0;
-
     virtual ~tee_qv_base() {};
 };
 
@@ -128,19 +115,6 @@ public:
 
     virtual quote3_error_t tee_free_verification_endorsement(
         sgx_ql_qve_collateral_t *pp_quote_collateral);
-
-    virtual quote3_error_t tee_get_qve_identity(
-        uint8_t **pp_qveid,
-        uint32_t *p_qveid_size,
-        uint8_t **pp_qveid_issue_chain,
-        uint32_t *p_qveid_issue_chain_size,
-        uint8_t **pp_root_ca_crl,
-        uint16_t *p_root_ca_crl_size);
-
-    virtual quote3_error_t tee_free_qve_identity(
-        uint8_t *p_qveid,
-        uint8_t *p_qveid_issue_chain,
-        uint8_t *p_root_ca_crl);
 };
 
 class tdx_qv : public sgx_qv {
