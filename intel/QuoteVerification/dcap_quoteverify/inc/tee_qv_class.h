@@ -40,7 +40,6 @@
 
 #include "sgx_qve_header.h"
 #include "sgx_qve_def.h"
-#include "sgx_urts.h"
 
 #if defined(__cplusplus)
 extern "C" {
