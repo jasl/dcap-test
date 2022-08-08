@@ -9,5 +9,7 @@ fn create_quote_vec(data: &[u8]) -> Result<Vec<u8>> {
 
 fn main() {
     let quote = create_quote_vec("Hello, world!".as_bytes()).expect("Create quote error");
-    println!("0x{}", hex::encode(quote));
+    fs::write("/data/storage_files/quote.dat", quote.clone()).expect("Write error");
+
+    println!("0x{}", hex::encode(quote.clone()));
 }
