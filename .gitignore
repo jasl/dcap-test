@@ -5,6 +5,9 @@
 /bin/**
 !/bin/.keep
 
+/prebuilt_patched_lib/**
+!/prebuilt_patched_lib/.keep
+
 /gramine-build/*.token
 /gramine-build/*.sig
 /gramine-build/*.manifest.sgx

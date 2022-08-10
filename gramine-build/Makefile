@@ -15,6 +15,9 @@ BIN_NAME = dcap-test
 DATA_DIRS = data/protected_files \
             data/storage_files
 
+# TODO: TMP
+DCAP_LIB_DIR ?= ../SGXDataCenterAttestationPrimitives/QuoteGeneration/build/linux
+
 GRAMINE_DIR ?= $(shell ./gramine-dir libs)
 GRAMINE_LIBOS ?= $(shell ./gramine-dir libos)
 GRAMINE_RUNTIME_DIR ?= $(shell ./gramine-dir runtime)
@@ -85,6 +88,8 @@ ifeq ($(USE_MUSL),0)
 endif
 	cp -rfL ${GRAMINE_DIR}/sgx ${RUNTIME_DIR}/
 	cp -rfL ${GRAMINE_LIBOS} ${RUNTIME_DIR}/
+	# TODO: TMP
+	cp -rfL ${DCAP_LIB_DIR}/* ${RUNTIME_DIR}/lib
 
 ${BIN_NAME}.sig: ${BIN_NAME}.manifest.sgx
 
