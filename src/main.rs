@@ -1,6 +1,3 @@
-#![feature(new_uninit)]
-#![feature(strict_provenance)]
-
 extern crate core;
 
 use anyhow::Result;
@@ -117,14 +114,59 @@ fn ecdsa_quote_verification(quote: &[u8]) {
     println!("{}", quote_collateral.tee_type);
     println!("Collateral PCK CRL issuer chain size:");
     println!("{}", quote_collateral.pck_crl_issuer_chain_size);
+    println!("Collateral PCK CRL issuer chain data:");
+    let pck_crl_issuer_chain = unsafe {
+        String::from_raw_parts(
+            quote_collateral.pck_crl_issuer_chain as *mut u8,
+            quote_collateral.pck_crl_issuer_chain_size as usize,
+            quote_collateral.pck_crl_issuer_chain_size as usize
+        )
+    };
+    println!("{}", pck_crl_issuer_chain);
     println!("Collateral ROOT CA CRL size:");
     println!("{}", quote_collateral.root_ca_crl_size);
+    println!("Collateral ROOT CA CRL data:");
+    let root_ca_crl = unsafe {
+        String::from_raw_parts(
+            quote_collateral.root_ca_crl as *mut u8,
+            quote_collateral.root_ca_crl_size as usize,
+            quote_collateral.root_ca_crl_size as usize
+        )
+    };
+    println!("{}", root_ca_crl);
     println!("Collateral TCB info size:");
     println!("{}", quote_collateral.tcb_info_size);
+    println!("Collateral TCB info data:");
+    let tcb_info = unsafe {
+        String::from_raw_parts(
+            quote_collateral.tcb_info as *mut u8,
+            quote_collateral.tcb_info_size as usize,
+            quote_collateral.tcb_info_size as usize
+        )
+    };
+    println!("{}", tcb_info);
     println!("Collateral QE identity issuer chain size:");
     println!("{}", quote_collateral.qe_identity_issuer_chain_size);
-    println!("Collateral QE Identity ize:");
+    println!("Collateral QE identity issuer chain data:");
+    let qe_identity_issuer_chain = unsafe {
+        String::from_raw_parts(
+            quote_collateral.qe_identity_issuer_chain as *mut u8,
+            quote_collateral.qe_identity_issuer_chain_size as usize,
+            quote_collateral.qe_identity_issuer_chain_size as usize
+        )
+    };
+    println!("{}", qe_identity_issuer_chain);
+    println!("Collateral QE Identity size:");
     println!("{}", quote_collateral.qe_identity_size);
+    println!("Collateral QE identity data:");
+    let qe_identity = unsafe {
+        String::from_raw_parts(
+            quote_collateral.qe_identity as *mut u8,
+            quote_collateral.qe_identity_size as usize,
+            quote_collateral.qe_identity_size as usize
+        )
+    };
+    println!("{}", qe_identity);
 
     // call DCAP quote verify library for quote verification
     // here you can choose 'trusted' or 'untrusted' quote verification by specifying parameter '&qve_report_info'
