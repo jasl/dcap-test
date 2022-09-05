@@ -46,7 +46,7 @@ DISTR_ID := $(call get_distr_info, '^ID=')
 DISTR_VER := $(call get_distr_info, '^VERSION_ID=')
 
 
-# DCAP requires prebuilt_patched_lib enclaves.
+# DCAP requires prebuilt enclaves.
 CHECK_OPT :=
 ifeq ("$(wildcard psw/ae/data/prebuilt)", "")
 CHECK_OPT := opt_check_failed

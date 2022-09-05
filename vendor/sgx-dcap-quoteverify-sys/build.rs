@@ -36,7 +36,7 @@ use std::path::PathBuf;
 
 fn main() {
     // Search patched library first
-    let dir = std::path::Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap()).join("../../SGXDataCenterAttestationPrimitives/QuoteGeneration/build/linux");
+    let dir = std::path::Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap()).join("../../SGXDataCenterAttestationPrimitives/QuoteVerification/dcap_quoteverify/linux");
     println!("cargo:rustc-link-search={}", dir.display());
 
     // Tell cargo to tell rustc to link the system

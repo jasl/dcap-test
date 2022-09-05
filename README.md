@@ -1,5 +1,16 @@
 # DCAP PoC
 
+## Build
+
+```
+cd SGXDataCenterAttestationPrimitives/QuoteVerification/dcap_quoteverify/linux
+make
+cd ../../../../gramine-build
+make run
+```
+
+## Sample
+
 Sample output
 
 ```
