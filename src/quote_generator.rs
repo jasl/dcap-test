@@ -4,13 +4,13 @@ use std::{fs, ptr, time};
 const FMSPC_SIZE: usize = 6;
 const CA_SIZE: usize = 10;
 
-pub struct quote_bag {
+pub struct QuoteBag {
     // TODO: Version of the bag
     pub quote: Vec<u8>,
     pub quote_collateral: qvl::sgx_ql_qve_collateral_t,
 }
 
-pub fn create_quote_bag(data: &[u8]) -> quote_bag {
+pub fn create_quote_bag(data: &[u8]) -> QuoteBag {
     // TODO: DCAP-only for now, should determine which RA type via `/dev/attestation/attestation_type`
     fs::write("/dev/attestation/user_report_data", data).expect("Write user report data error");
     let quote = fs::read("/dev/attestation/quote").expect("Create quote error");
@@ -55,13 +55,13 @@ pub fn create_quote_bag(data: &[u8]) -> quote_bag {
 
     // TODO: may requires to free collateral
 
-    quote_bag {
+    QuoteBag {
         quote,
         quote_collateral: *quote_collateral
     }
 }
 
-pub fn quote_verification(quote_bag: quote_bag) {
+pub fn quote_verification(quote_bag: QuoteBag) {
     let quote = quote_bag.quote;
     let quote_collateral = quote_bag.quote_collateral;
 
@@ -99,7 +99,7 @@ pub fn quote_verification(quote_bag: quote_bag) {
     println!("Collateral PCK CRL issuer chain data:");
     let pck_crl_issuer_chain = unsafe {
         let slice = core::slice::from_raw_parts(
-            quote_collateral.pck_crl_issuer_chain as *mut u8,
+            quote_collateral.pck_crl_issuer_chain as *const u8,
             quote_collateral.pck_crl_issuer_chain_size as usize,
         );
 
@@ -111,7 +111,7 @@ pub fn quote_verification(quote_bag: quote_bag) {
     println!("Collateral ROOT CA CRL data:");
     let root_ca_crl = unsafe {
         let slice = core::slice::from_raw_parts(
-            quote_collateral.root_ca_crl as *mut u8,
+            quote_collateral.root_ca_crl as *const u8,
             quote_collateral.root_ca_crl_size as usize
         );
 
@@ -123,7 +123,7 @@ pub fn quote_verification(quote_bag: quote_bag) {
     println!("Collateral TCB info data:");
     let tcb_info = unsafe {
         let slice = core::slice::from_raw_parts(
-            quote_collateral.tcb_info as *mut u8,
+            quote_collateral.tcb_info as *const u8,
             quote_collateral.tcb_info_size as usize
         );
 
@@ -135,7 +135,7 @@ pub fn quote_verification(quote_bag: quote_bag) {
     println!("Collateral QE identity issuer chain data:");
     let qe_identity_issuer_chain = unsafe {
         let slice = core::slice::from_raw_parts(
-            quote_collateral.qe_identity_issuer_chain as *mut u8,
+            quote_collateral.qe_identity_issuer_chain as *const u8,
             quote_collateral.qe_identity_issuer_chain_size as usize
         );
 
@@ -147,7 +147,7 @@ pub fn quote_verification(quote_bag: quote_bag) {
     println!("Collateral QE identity data:");
     let qe_identity = unsafe {
         let slice = core::slice::from_raw_parts(
-            quote_collateral.qe_identity as *mut u8,
+            quote_collateral.qe_identity as *const u8,
             quote_collateral.qe_identity_size as usize
         );
 
