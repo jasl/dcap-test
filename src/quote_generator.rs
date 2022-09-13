@@ -1,43 +1,33 @@
-extern crate core;
-
-mod quote_generator;
-mod quote_verifier;
-
-use anyhow::Result;
-use std::{fs, ptr, time};
 use sgx_dcap_quoteverify_rs as qvl;
+use std::{fs, ptr, time};
 
-// #define FMSPC_SIZE 6
-// #define CA_SIZE 10
 const FMSPC_SIZE: usize = 6;
 const CA_SIZE: usize = 10;
 
-fn create_quote_vec(data: &[u8]) -> Result<Vec<u8>> {
-    // TODO: DCAP-only for now, should determine which RA type via `/dev/attestation/attestation_type`
-    fs::write("/dev/attestation/user_report_data", data)?;
-    Ok(fs::read("/dev/attestation/quote")?)
+pub struct quote_bag {
+    // TODO: Version of the bag
+    pub quote: Vec<u8>,
+    pub quote_collateral: qvl::sgx_ql_qve_collateral_t,
 }
 
-/// Quote verification with QvE/QVL
-///
-/// # Param
-/// - **quote**\
-/// ECDSA quote buffer.
-/// - **use_qve**\
-/// Set quote verification mode.\
-///     - If true, quote verification will be performed by Intel QvE.
-///     - If false, quote verification will be performed by untrusted QVL.
-///
-fn ecdsa_quote_verification(quote: &[u8]) {
-    let mut supplemental_data_size = 0u32;      // mem::zeroed() is safe as long as the struct doesn't have zero-invalid types, like pointers
-    let mut supplemental_data: qvl::sgx_ql_qv_supplemental_t = unsafe { std::mem::zeroed() };
-    let mut quote_verification_result = qvl::sgx_ql_qv_result_t::SGX_QL_QV_RESULT_UNSPECIFIED;
-    let mut collateral_expiration_status = 1u32;
+pub fn create_quote_bag(data: &[u8]) -> quote_bag {
+    // TODO: DCAP-only for now, should determine which RA type via `/dev/attestation/attestation_type`
+    fs::write("/dev/attestation/user_report_data", data).expect("Write user report data error");
+    let quote = fs::read("/dev/attestation/quote").expect("Create quote error");
+
+    println!("Quote hex:");
+    println!("0x{}", hex::encode(quote.clone()));
 
     let mut fmsp_from_quote: [u8; FMSPC_SIZE] = [0u8; FMSPC_SIZE];
     let mut ca_from_quote: [u8; CA_SIZE] = [0u8; CA_SIZE];
+
+    println!("FMSP hex:");
+    println!("0x{}", hex::encode(fmsp_from_quote.clone()));
+    println!("CA hex:");
+    println!("0x{}", hex::encode(ca_from_quote.clone()));
+
     let dcap_ret = qvl::qvl_get_fmspc_ca_from_quote(
-        quote,
+        &quote,
         &mut fmsp_from_quote,
         &mut ca_from_quote
     );
@@ -63,36 +53,21 @@ fn ecdsa_quote_verification(quote: &[u8]) {
 
     let quote_collateral: &qvl::sgx_ql_qve_collateral_t = &unsafe { *p_quote_collateral };
 
-    // Untrusted quote verification
+    // TODO: may requires to free collateral
 
-    // call DCAP quote verify library to get supplemental data size
-    //
-    let dcap_ret = qvl::sgx_qv_get_quote_supplemental_data_size(&mut supplemental_data_size);
-    if qvl::quote3_error_t::SGX_QL_SUCCESS == dcap_ret && std::mem::size_of::<qvl::sgx_ql_qv_supplemental_t>() as u32 == supplemental_data_size {
-        println!("\tInfo: sgx_qv_get_quote_supplemental_data_size successfully returned.");
-    } else {
-        if dcap_ret != qvl::quote3_error_t::SGX_QL_SUCCESS {
-            println!("\tError: sgx_qv_get_quote_supplemental_data_size failed: {:#04x}", dcap_ret as u32);
-        }
-        if supplemental_data_size != std::mem::size_of::<qvl::sgx_ql_qv_supplemental_t>().try_into().unwrap() {
-            println!("\tWarning: Quote supplemental data size is different between DCAP QVL and QvE, please make sure you installed DCAP QVL and QvE from same release.");
-        }
-        supplemental_data_size = 0u32;
+    quote_bag {
+        quote,
+        quote_collateral: *quote_collateral
     }
+}
+
+pub fn quote_verification(quote_bag: quote_bag) {
+    let quote = quote_bag.quote;
+    let quote_collateral = quote_bag.quote_collateral;
 
     // set current time. This is only for sample purposes, in production mode a trusted time should be used.
     //
     let current_time: i64 = time::SystemTime::now().duration_since(time::SystemTime::UNIX_EPOCH).unwrap().as_secs().try_into().unwrap();
-
-    let p_supplemental_data = match supplemental_data_size {
-        0 => None,
-        _ => Some(&mut supplemental_data),
-    };
-
-    println!("FMSP hex:");
-    println!("0x{}", hex::encode(fmsp_from_quote.clone()));
-    println!("CA hex:");
-    println!("0x{}", hex::encode(ca_from_quote.clone()));
 
     // typedef struct _sgx_ql_qve_collateral_t {
     // 	uint32_t version;
@@ -184,15 +159,18 @@ fn ecdsa_quote_verification(quote: &[u8]) {
     // here you can choose 'trusted' or 'untrusted' quote verification by specifying parameter '&qve_report_info'
     // if '&qve_report_info' is NOT NULL, this API will call Intel QvE to verify quote
     // if '&qve_report_info' is NULL, this API will call 'untrusted quote verify lib' to verify quote, this mode doesn't rely on SGX capable system, but the results can not be cryptographically authenticated
+    let mut quote_verification_result = qvl::sgx_ql_qv_result_t::SGX_QL_QV_RESULT_UNSPECIFIED;
+    let mut collateral_expiration_status = 1u32;
+
     let dcap_ret = qvl::sgx_qv_verify_quote(
-        quote,
-        Some(quote_collateral),
+        &quote,
+        Some(&quote_collateral),
         current_time,
         &mut collateral_expiration_status,
         &mut quote_verification_result,
         None,
-        supplemental_data_size,
-        p_supplemental_data);
+        0,
+        None);
     if qvl::quote3_error_t::SGX_QL_SUCCESS == dcap_ret {
         println!("\tInfo: App: sgx_qv_verify_quote successfully returned.");
     } else {
@@ -200,7 +178,7 @@ fn ecdsa_quote_verification(quote: &[u8]) {
     }
 
     // check verification result
-    //
+
     match quote_verification_result {
         qvl::sgx_ql_qv_result_t::SGX_QL_QV_RESULT_OK => {
             // check verification collateral expiration status
@@ -225,32 +203,4 @@ fn ecdsa_quote_verification(quote: &[u8]) {
             println!("\tError: App: Verification completed with Terminal result: {:x}", quote_verification_result as u32);
         },
     }
-
-    // check supplemental data if necessary
-    //
-    if supplemental_data_size > 0 {
-
-        // you can check supplemental data based on your own attestation/verification policy
-        // here we only print supplemental data version for demo usage
-        //
-        println!("\tInfo: Supplemental data version: {}", supplemental_data.version);
-    }
-
-    // TODO: may requires to free collateral
-}
-
-fn main() {
-    // let quote = create_quote_vec("Hello, world!".as_bytes()).expect("Create quote error");
-    // // fs::write("/data/storage_files/quote.dat", quote.clone()).expect("Write error");
-    //
-    // println!("Quote hex:");
-    // println!("0x{}", hex::encode(quote.clone()));
-    //
-    // println!("Untrusted quote verification:");
-    // ecdsa_quote_verification(&quote);
-
-    let quote_bag = quote_generator::create_quote_bag("Hello, world!".as_bytes());
-    quote_generator::quote_verification(quote_bag);
-
-    println!("Done");
 }
