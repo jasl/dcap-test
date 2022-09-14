@@ -1,3 +1,4 @@
+use core::panicking::panic;
 use sgx_dcap_quoteverify_rs as qvl;
 
 // #define SUPPLEMENTAL_DATA_VERSION 3
@@ -9,10 +10,36 @@ use sgx_dcap_quoteverify_rs as qvl;
 // #define CA_SIZE 10
 // #define SGX_CPUSVN_SIZE   16
 
+// const uint32_t TEE_TYPE_SGX = 0x00000000;
+// const uint32_t TEE_TYPE_TDX = 0x00000081;
+// const uint16_t QUOTE_VERSION_3 = 3;
+// const uint16_t QUOTE_VERSION_4 = 4;
+//
+// const uint16_t ECDSA_256_WITH_P256_CURVE = 2;
+// const uint16_t ECDSA_384_WITH_P384_CURVE = 3;
+// constexpr size_t ECDSA_P256_SIGNATURE_BYTE_LEN = 64;
+// constexpr size_t ENCLAVE_REPORT_BYTE_LEN = 384;
+// constexpr size_t TD_REPORT_BYTE_LEN = 584;
+//
+// const uint16_t PCK_ID_PLAIN_PPID = 1;
+// const uint16_t PCK_ID_ENCRYPTED_PPID_2048 = 2;
+// const uint16_t PCK_ID_ENCRYPTED_PPID_3072 = 3;
+// const uint16_t PCK_ID_PCK_CERTIFICATE = 4;
+// const uint16_t PCK_ID_PCK_CERT_CHAIN = 5;
+// const uint16_t PCK_ID_QE_REPORT_CERTIFICATION_DATA = 6;
+//
+// const std::array<uint16_t, 2> ALLOWED_QUOTE_VERSIONS = {{ QUOTE_VERSION_3, QUOTE_VERSION_4 }};
+// const std::array<uint32_t, 2> ALLOWED_TEE_TYPES = {{ TEE_TYPE_SGX, TEE_TYPE_TDX }};
+// const std::array<uint16_t, 1> ALLOWED_ATTESTATION_KEY_TYPES = {{ ECDSA_256_WITH_P256_CURVE }};
+// const std::array<uint8_t, 16> INTEL_QE_VENDOR_ID = {{ 0x93, 0x9A, 0x72, 0x33, 0xF7, 0x9C, 0x4C, 0xA9, 0x94, 0x0A, 0x0D, 0xB3, 0x95, 0x7F, 0x06, 0x07 }};
+
 const QVE_COLLATERAL_VERSION1: u32 = 0x1;
 const QVE_COLLATERAL_VERSION3: u32 = 0x3;
 const QVE_COLLATERAL_VERSION31: u32 = 0x00010003;
 const QVE_COLLATERAL_VERSION4: u32 = 0x4;
+
+const SGX_ID: &str = "SGX";
+const TDX_ID: &str = "TDX";
 
 const QUOTE_MIN_SIZE: usize = 1020;
 const QUOTE_CERT_TYPE: u32 = 5;
@@ -149,16 +176,74 @@ pub fn sgx_qv_verify_quote(
 
     // TODO: ret = extract_chain_from_quote(p_quote, quote_size, &pck_cert_chain_size, &p_pck_cert_chain);
 
-    // TODO: tcb_info_obj = json::TcbInfo::parse(p_quote_collateral->tcb_info);
-    let tcb_info = unsafe {
+    let tcb_info_json = unsafe {
         let slice = core::slice::from_raw_parts(
             quote_collateral.tcb_info as *const u8,
-            quote_collateral.tcb_info_size as usize
+            (quote_collateral.tcb_info_size - 1) as usize // Trim '\0'
         );
 
         core::str::from_utf8(slice).expect("Collateral TCB info should an UTF-8 string")
     };
-    let parsed_tcb_info: serde_json::Value = serde_json::from_str(tcb_info).expect("Should be a valid Json");
+    let tcb_info_json: serde_json::Value = serde_json::from_str(tcb_info_json).expect("Could not parse TCB info JSON");
+
+    let tcb_info = tcb_info_json.get("tcbInfo").expect("Missing [tcbInfo] field of TCB info JSON");
+    let tcb_info = tcb_info.as_object().expect("[tcbInfo] field of TCB info JSON should be an object");
+
+    let signature = tcb_info_json.get("signature").expect("Missing [signature] field of TCB info JSON");
+    let signature = signature.as_str().expect("Could not parse [signature] field of TCB info JSON to string");
+    // TODO: validate length
+
+    let version = tcb_info.get("version").expect("TCB Info JSON should has [version] field");
+    let version = version.as_u64().expect("Could not parse [version] field of TCB info JSON to integer");
+    if version != 2 && version != 3 {
+        panic!("Unsupported version {}", version);
+    }
+
+    // TODO: Refactor with enum
+    let id = {
+        if version == 3 {
+            let _id = tcb_info.get("id").expect("TCB Info JSON should has [id] field");
+            let _id = _id.as_str().expect("Could not parse [id] field of TCB info JSON to string");
+            if _id != SGX_ID && _id != TDX_ID {
+                panic!("Unsupported id {}", _id);
+            }
+            _id
+        } else {
+            SGX_ID
+        }
+    };
+
+    // TODO: V2 & V3 specific fields
+
+    let issue_date = tcb_info.get("issueDate").expect("TCB Info JSON should has [issueDate] field");
+    let issue_date = issue_date.as_str().expect("Could not parse [issueDate] field of TCB info JSON to string");
+    let issue_date = chrono::DateTime::parse_from_rfc3339(issue_date).expect("[issueDate] should be ISO formatted date");
+
+    let next_update = tcb_info.get("nextUpdate").expect("TCB Info JSON should has [nextUpdate] field");
+    let next_update = next_update.as_str().expect("Could not parse [nextUpdate] field of TCB info JSON to string");
+    let next_update = chrono::DateTime::parse_from_rfc3339(next_update).expect("[nextUpdate] should be ISO formatted date");
+
+    let fmspc = tcb_info.get("fmspc").expect("TCB Info JSON should has [fmspc] field");
+    let fmspc = fmspc.as_str().expect("Could not parse [fmspc] field of TCB info JSON to string");
+
+    let pce_id = tcb_info.get("pceId").expect("TCB Info JSON should has [pceId] field");
+    let pce_id = pce_id.as_str().expect("Could not parse [pceId] field of TCB info JSON to string");
+
+    println!("Parsed TCB info");
+    println!("Signature: {}", signature);
+    println!("Version: {}", version);
+    println!("Id: {}", id);
+    println!("Issue date: {}", issue_date);
+    println!("Next update: {}", next_update);
+    println!("FMSPC: {}", fmspc);
+    println!("PCE Id: {}", pce_id);
+
+    let tcb_levels = tcb_info.get("tcbLevels").expect("Missing [tcbLevels] field of TCB info JSON");
+    let tcb_levels = tcb_levels.as_array().expect("[tcbLevels] field of TCB info JSON should be an array");
+    if tcb_levels.is_empty() {
+        panic!("[tcbLevels] field of TCB info JSON should not empty")
+    }
+
 
     qvl::quote3_error_t::SGX_QL_SUCCESS
 }

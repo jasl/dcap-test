@@ -21,11 +21,6 @@ pub fn create_quote_bag(data: &[u8]) -> QuoteBag {
     let mut fmsp_from_quote: [u8; FMSPC_SIZE] = [0u8; FMSPC_SIZE];
     let mut ca_from_quote: [u8; CA_SIZE] = [0u8; CA_SIZE];
 
-    println!("FMSP hex:");
-    println!("0x{}", hex::encode(fmsp_from_quote.clone()));
-    println!("CA hex:");
-    println!("0x{}", hex::encode(ca_from_quote.clone()));
-
     let dcap_ret = qvl::qvl_get_fmspc_ca_from_quote(
         &quote,
         &mut fmsp_from_quote,
@@ -37,6 +32,11 @@ pub fn create_quote_bag(data: &[u8]) -> QuoteBag {
     } else {
         panic!("Error: qvl_get_fmspc_ca_from_quote failed: {:#04x}", dcap_ret as u32);
     }
+
+    println!("FMSP hex:");
+    println!("0x{}", hex::encode(fmsp_from_quote.clone()));
+    println!("CA hex:");
+    println!("0x{}", hex::encode(ca_from_quote.clone()));
 
     let mut p_quote_collateral: *mut qvl::sgx_ql_qve_collateral_t = ptr::null_mut();
     let dcap_ret = qvl::sgx_dcap_retrieve_verification_collateral(
@@ -61,13 +61,10 @@ pub fn create_quote_bag(data: &[u8]) -> QuoteBag {
     }
 }
 
-pub fn quote_verification(quote_bag: QuoteBag) {
-    let quote = quote_bag.quote;
-    let quote_collateral = quote_bag.quote_collateral;
-
+pub fn quote_verification(quote: Vec<u8>, quote_collateral: qvl::sgx_ql_qve_collateral_t) {
     // set current time. This is only for sample purposes, in production mode a trusted time should be used.
     //
-    let current_time: i64 = time::SystemTime::now().duration_since(time::SystemTime::UNIX_EPOCH).unwrap().as_secs().try_into().unwrap();
+    let current_time: u64 = time::SystemTime::now().duration_since(time::SystemTime::UNIX_EPOCH).unwrap().as_secs().try_into().unwrap();
 
     // typedef struct _sgx_ql_qve_collateral_t {
     // 	uint32_t version;
@@ -165,7 +162,7 @@ pub fn quote_verification(quote_bag: QuoteBag) {
     let dcap_ret = qvl::sgx_qv_verify_quote(
         &quote,
         Some(&quote_collateral),
-        current_time,
+        current_time as i64, // TODO: WHY i64?
         &mut collateral_expiration_status,
         &mut quote_verification_result,
         None,
