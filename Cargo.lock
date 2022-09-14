@@ -98,6 +98,7 @@ checksum = "bfd4d1b31faaa3a89d7934dbded3111da0d2ef28e3ebccdb4f0179f5929d1ef1"
 dependencies = [
  "num-integer",
  "num-traits",
+ "serde",
 ]
 
 [[package]]
@@ -142,6 +143,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "hex",
+ "log",
  "ring",
  "serde_json",
  "sgx-dcap-quoteverify-rs",

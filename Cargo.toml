@@ -6,11 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+hex = { version = "0.4.3", default-features = false, features = ["alloc", "serde"] }
 chrono = { version = "0.4.22", default-features = false, features = ["alloc", "serde"] }
 ring = { version = "0.16.20", default-features = false, features = ["alloc"] }
 webpki = { version = "0.22.0", default-features = false, features = ["alloc"] }
 serde_json = { version = "1.0.85", default-features = false, features = ["alloc"] }
-anyhow = "1.0"
-sgx-dcap-quoteverify-rs = { path = "vendor/sgx-dcap-quoteverify-rs"}
+sgx-dcap-quoteverify-rs = { path = "vendor/sgx-dcap-quoteverify-rs" }
 
-hex = "*"
+log = { version = "0.4.17", default-features = false }
+anyhow = "1.0"

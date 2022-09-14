@@ -1,9 +1,6 @@
-extern crate core;
-
-use std::borrow::Borrow;
-
 mod quote_generator;
 mod quote_verifier;
+mod tcb_info;
 
 fn main() {
     let quote_bag = quote_generator::create_quote_bag("Hello, world!".as_bytes());

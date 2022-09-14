@@ -1,4 +1,3 @@
-use core::panicking::panic;
 use sgx_dcap_quoteverify_rs as qvl;
 
 // #define SUPPLEMENTAL_DATA_VERSION 3
@@ -225,9 +224,13 @@ pub fn sgx_qv_verify_quote(
 
     let fmspc = tcb_info.get("fmspc").expect("TCB Info JSON should has [fmspc] field");
     let fmspc = fmspc.as_str().expect("Could not parse [fmspc] field of TCB info JSON to string");
+    let fmspc = hex::decode(fmspc).expect("Could not parse [fmspc] field of TCB info JSON to bytes");
+    let fmspc = fmspc.as_slice();
 
     let pce_id = tcb_info.get("pceId").expect("TCB Info JSON should has [pceId] field");
     let pce_id = pce_id.as_str().expect("Could not parse [pceId] field of TCB info JSON to string");
+    let pce_id = hex::decode(pce_id).expect("Could not parse [pceId] field of TCB info JSON to bytes");
+    let pce_id = pce_id.as_slice();
 
     println!("Parsed TCB info");
     println!("Signature: {}", signature);
@@ -235,15 +238,14 @@ pub fn sgx_qv_verify_quote(
     println!("Id: {}", id);
     println!("Issue date: {}", issue_date);
     println!("Next update: {}", next_update);
-    println!("FMSPC: {}", fmspc);
-    println!("PCE Id: {}", pce_id);
+    println!("FMSPC: {}", hex::encode(fmspc));
+    println!("PCE Id: {}", hex::encode(pce_id));
 
     let tcb_levels = tcb_info.get("tcbLevels").expect("Missing [tcbLevels] field of TCB info JSON");
     let tcb_levels = tcb_levels.as_array().expect("[tcbLevels] field of TCB info JSON should be an array");
     if tcb_levels.is_empty() {
         panic!("[tcbLevels] field of TCB info JSON should not empty")
     }
-
 
     qvl::quote3_error_t::SGX_QL_SUCCESS
 }
