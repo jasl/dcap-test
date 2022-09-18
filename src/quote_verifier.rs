@@ -81,8 +81,6 @@ fn extract_chain_from_quote(quote: &[u8], pck_cert_chain: String) -> qvl::quote3
         return qvl::quote3_error_t::SGX_QL_ERROR_INVALID_PARAMETER;
     }
 
-
-
     qvl::quote3_error_t::SGX_QL_SUCCESS
 }
 
