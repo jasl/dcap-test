@@ -1,4 +1,6 @@
+use serde_json::Value::String;
 use sgx_dcap_quoteverify_rs as qvl;
+use crate::{Quote, quote};
 
 // #define SUPPLEMENTAL_DATA_VERSION 3
 // #define QVE_COLLATERAL_VERSION1 0x1
@@ -49,40 +51,6 @@ const PROCESSOR_ISSUER_ID: &str =  "processor";
 const PLATFORM_ISSUER_ID: &str =  "platform";
 const PEM_CRL_PREFIX: &str =  "-----BEGIN X509 CRL-----";
 const PEM_CRL_PREFIX_SIZE: usize = 24;
-
-fn get_qe_certification_data_size_from_quote(quote: &[u8]) -> usize {
-    0
-}
-
-/**
- * Given a quote with cert type 5, extract PCK Cert chain and return it.
- * @param p_quote[IN] - Pointer to a quote buffer.
- * @param quote_size[IN] - Size of input quote buffer.
- * @param p_pck_cert_chain_size[OUT] - Pointer to a extracted chain size.
- * @param pp_pck_cert_chain[OUT] - Pointer to a pointer to a buffer to write PCK Cert chain to.
- *
- * @return quote3_error_t code of the operation, one of:
- *      - SGX_QL_SUCCESS
- *      - SGX_QL_ERROR_INVALID_PARAMETER
- *      - SGX_QL_PCK_CERT_UNSUPPORTED_FORMAT
- *      - SGX_QL_QUOTE_CERTIFICATION_DATA_UNSUPPORTED
- *      - SGX_QL_ERROR_UNEXPECTED
- **/
-// static quote3_error_t extract_chain_from_quote(const uint8_t *p_quote,
-// uint32_t quote_size,
-// uint32_t* p_pck_cert_chain_size,
-// uint8_t** pp_pck_cert_chain)
-fn extract_chain_from_quote(quote: &[u8], pck_cert_chain: String) -> qvl::quote3_error_t {
-
-    // if (p_quote == NULL || quote_size < QUOTE_MIN_SIZE || p_pck_cert_chain_size == NULL || pp_pck_cert_chain == NULL || *pp_pck_cert_chain != NULL) {
-    //     return SGX_QL_ERROR_INVALID_PARAMETER;
-    // }
-    if quote.len() < QUOTE_MIN_SIZE {
-        return qvl::quote3_error_t::SGX_QL_ERROR_INVALID_PARAMETER;
-    }
-
-    qvl::quote3_error_t::SGX_QL_SUCCESS
-}
 
 /// Perform SGX ECDSA quote verification.
 ///
@@ -171,79 +139,20 @@ pub fn sgx_qv_verify_quote(
         return qvl::quote3_error_t::SGX_QL_COLLATERAL_VERSION_NOT_SUPPORTED;
     }
 
+    let quote = Quote::parse(quote).unwrap();
+    let certification_data = match quote.signed_data {
+        quote::QuoteAuthData::Ecdsa256Bit { certification_data, .. } => {
+            Some(certification_data)
+        },
+        _ => None
+    };
+    if certification_data.is_none() {
+        return qvl::quote3_error_t::SGX_QL_ERROR_INVALID_PARAMETER
+    }
+    let certification_data = certification_data.unwrap();
+    println!("certificate: {}", core::str::from_utf8(&certification_data.data.clone()).unwrap_or(format!("0x{}", hex::encode(certification_data.data.clone())).as_str()));
+
     // TODO: ret = extract_chain_from_quote(p_quote, quote_size, &pck_cert_chain_size, &p_pck_cert_chain);
-
-    let tcb_info_json = unsafe {
-        let slice = core::slice::from_raw_parts(
-            quote_collateral.tcb_info as *const u8,
-            (quote_collateral.tcb_info_size - 1) as usize // Trim '\0'
-        );
-
-        core::str::from_utf8(slice).expect("Collateral TCB info should an UTF-8 string")
-    };
-    let tcb_info_json: serde_json::Value = serde_json::from_str(tcb_info_json).expect("Could not parse TCB info JSON");
-
-    let tcb_info = tcb_info_json.get("tcbInfo").expect("Missing [tcbInfo] field of TCB info JSON");
-    let tcb_info = tcb_info.as_object().expect("[tcbInfo] field of TCB info JSON should be an object");
-
-    let signature = tcb_info_json.get("signature").expect("Missing [signature] field of TCB info JSON");
-    let signature = signature.as_str().expect("Could not parse [signature] field of TCB info JSON to string");
-    // TODO: validate length
-
-    let version = tcb_info.get("version").expect("TCB Info JSON should has [version] field");
-    let version = version.as_u64().expect("Could not parse [version] field of TCB info JSON to integer");
-    if version != 2 && version != 3 {
-        panic!("Unsupported version {}", version);
-    }
-
-    // TODO: Refactor with enum
-    let id = {
-        if version == 3 {
-            let _id = tcb_info.get("id").expect("TCB Info JSON should has [id] field");
-            let _id = _id.as_str().expect("Could not parse [id] field of TCB info JSON to string");
-            if _id != SGX_ID && _id != TDX_ID {
-                panic!("Unsupported id {}", _id);
-            }
-            _id
-        } else {
-            SGX_ID
-        }
-    };
-
-    // TODO: V2 & V3 specific fields
-
-    let issue_date = tcb_info.get("issueDate").expect("TCB Info JSON should has [issueDate] field");
-    let issue_date = issue_date.as_str().expect("Could not parse [issueDate] field of TCB info JSON to string");
-    let issue_date = chrono::DateTime::parse_from_rfc3339(issue_date).expect("[issueDate] should be ISO formatted date");
-
-    let next_update = tcb_info.get("nextUpdate").expect("TCB Info JSON should has [nextUpdate] field");
-    let next_update = next_update.as_str().expect("Could not parse [nextUpdate] field of TCB info JSON to string");
-    let next_update = chrono::DateTime::parse_from_rfc3339(next_update).expect("[nextUpdate] should be ISO formatted date");
-
-    let fmspc = tcb_info.get("fmspc").expect("TCB Info JSON should has [fmspc] field");
-    let fmspc = fmspc.as_str().expect("Could not parse [fmspc] field of TCB info JSON to string");
-    let fmspc = hex::decode(fmspc).expect("Could not parse [fmspc] field of TCB info JSON to bytes");
-    let fmspc = fmspc.as_slice();
-
-    let pce_id = tcb_info.get("pceId").expect("TCB Info JSON should has [pceId] field");
-    let pce_id = pce_id.as_str().expect("Could not parse [pceId] field of TCB info JSON to string");
-    let pce_id = hex::decode(pce_id).expect("Could not parse [pceId] field of TCB info JSON to bytes");
-    let pce_id = pce_id.as_slice();
-
-    println!("Parsed TCB info");
-    println!("Signature: {}", signature);
-    println!("Version: {}", version);
-    println!("Id: {}", id);
-    println!("Issue date: {}", issue_date);
-    println!("Next update: {}", next_update);
-    println!("FMSPC: {}", hex::encode(fmspc));
-    println!("PCE Id: {}", hex::encode(pce_id));
-
-    let tcb_levels = tcb_info.get("tcbLevels").expect("Missing [tcbLevels] field of TCB info JSON");
-    let tcb_levels = tcb_levels.as_array().expect("[tcbLevels] field of TCB info JSON should be an array");
-    if tcb_levels.is_empty() {
-        panic!("[tcbLevels] field of TCB info JSON should not empty")
-    }
 
     qvl::quote3_error_t::SGX_QL_SUCCESS
 }
