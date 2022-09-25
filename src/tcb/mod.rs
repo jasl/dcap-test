@@ -116,7 +116,7 @@ pub struct TCBInfo {
 }
 
 impl TCBInfo {
-    pub fn from_json_str(json_str: &str) -> Result<TCBInfo, ParseError> {
+    pub fn from_json_str(json_str: &str) -> Result<Self, ParseError> {
         let tcb_info_json: serde_json::Value = serde_json::from_str(json_str).expect("Could not parse TCB info JSON");
         let tcb_info_json = tcb_info_json.as_object().expect("TCB info JSON should be an object");
 
@@ -212,12 +212,10 @@ impl TCBInfo {
         let fmspc = tcb_info.get("fmspc").expect("TCB Info JSON should has [fmspc] field");
         let fmspc = fmspc.as_str().expect("Could not parse [fmspc] field of TCB info JSON to string");
         let fmspc = hex::decode(fmspc).expect("Could not parse [fmspc] field of TCB info JSON to bytes");
-        let fmspc = fmspc.to_vec();
 
         let pce_id = tcb_info.get("pceId").expect("TCB Info JSON should has [pceId] field");
         let pce_id = pce_id.as_str().expect("Could not parse [pceId] field of TCB info JSON to string");
         let pce_id = hex::decode(pce_id).expect("Could not parse [pceId] field of TCB info JSON to bytes");
-        let pce_id = pce_id.to_vec();
 
         println!("= Parsed TCB info =");
         println!("Signature: {}", signature);

@@ -1,6 +1,10 @@
+use std::panic;
 use serde_json::Value::String;
 use sgx_dcap_quoteverify_rs as qvl;
-use crate::{Quote, quote};
+use crate::{qe_identity, Quote, quote, tcb};
+use der::{Decode, Enumerated, Error, ErrorKind, Sequence};
+
+use chrono::{DateTime, FixedOffset, Timelike, TimeZone};
 
 // #define SUPPLEMENTAL_DATA_VERSION 3
 // #define QVE_COLLATERAL_VERSION1 0x1
@@ -51,6 +55,14 @@ const PROCESSOR_ISSUER_ID: &str =  "processor";
 const PLATFORM_ISSUER_ID: &str =  "platform";
 const PEM_CRL_PREFIX: &str =  "-----BEGIN X509 CRL-----";
 const PEM_CRL_PREFIX_SIZE: usize = 24;
+
+const INTEL_ROOT_PUB_KEY: [u8; 65] = [
+    0x04, 0x0b, 0xa9, 0xc4, 0xc0, 0xc0, 0xc8, 0x61, 0x93, 0xa3, 0xfe, 0x23, 0xd6, 0xb0, 0x2c,
+    0xda, 0x10, 0xa8, 0xbb, 0xd4, 0xe8, 0x8e, 0x48, 0xb4, 0x45, 0x85, 0x61, 0xa3, 0x6e, 0x70,
+    0x55, 0x25, 0xf5, 0x67, 0x91, 0x8e, 0x2e, 0xdc, 0x88, 0xe4, 0x0d, 0x86, 0x0b, 0xd0, 0xcc,
+    0x4e, 0xe2, 0x6a, 0xac, 0xc9, 0x88, 0xe5, 0x05, 0xa9, 0x53, 0x55, 0x8c, 0x45, 0x3f, 0x6b,
+    0x09, 0x04, 0xae, 0x73, 0x94
+];
 
 /// Perform SGX ECDSA quote verification.
 ///
@@ -150,9 +162,227 @@ pub fn sgx_qv_verify_quote(
         return qvl::quote3_error_t::SGX_QL_ERROR_INVALID_PARAMETER
     }
     let certification_data = certification_data.unwrap();
-    println!("certificate: {}", core::str::from_utf8(&certification_data.data.clone()).unwrap_or(format!("0x{}", hex::encode(certification_data.data.clone())).as_str()));
+    println!("certificate: {}", core::str::from_utf8(&certification_data.data.clone()).unwrap());
+    // Concatenated PCK Cert Chain (PEM formatted). PCK Leaf Cert || Intermediate CA Cert || Root CA Cert
+    let pems = pem::parse_many(&certification_data.data).unwrap();
+    println!("certs: {}", pems.len());
+    // TODO: pem.len() == 3
+    // let cert = x509_cert::TbsCertificate::from_der(pems.first().unwrap().contents.as_slice());
+    let cert_chain: Vec<x509_cert::Certificate> = pems.iter().map(move |pem| x509_cert::Certificate::from_der(&pem.contents).unwrap()).collect();
+    println!("{:?}", cert_chain);
 
-    // TODO: ret = extract_chain_from_quote(p_quote, quote_size, &pck_cert_chain_size, &p_pck_cert_chain);
+    // TODO: Check crl format
+    let raw_root_ca_crl = unsafe {
+        let slice = core::slice::from_raw_parts(
+            quote_collateral.root_ca_crl as *const u8,
+            (quote_collateral.root_ca_crl_size - 1) as usize // trim the last '\0' terminator
+        );
+
+        slice.to_vec()
+    };
+    // the doc said Version 3 is base16 der, but actually is binary der
+    let root_ca_crl = x509_cert::crl::CertificateList::from_der(&raw_root_ca_crl).unwrap();
+    println!("{:?}", root_ca_crl);
+
+    let raw_pck_crl = unsafe {
+        let slice = core::slice::from_raw_parts(
+            quote_collateral.pck_crl as *const u8,
+            (quote_collateral.pck_crl_size - 1) as usize // trim the last '\0' terminator
+        );
+
+        slice.to_vec()
+    };
+    let pck_crl = x509_cert::crl::CertificateList::from_der(&raw_pck_crl).unwrap();
+    println!("{:?}", pck_crl);
+
+    let root_cert_pem = pems.last().unwrap(); // TODO: improve this?
+    let root_cert = x509_cert::Certificate::from_der(&root_cert_pem.contents).unwrap();
+    let root_pub_key_from_cert = root_cert.tbs_certificate.subject_public_key_info.subject_public_key;
+    if root_pub_key_from_cert != INTEL_ROOT_PUB_KEY {
+        println!("{:?}", root_pub_key_from_cert);
+        println!("{:?}", INTEL_ROOT_PUB_KEY);
+        panic!("root_pub_key_from_cert != INTEL_ROOT_PUB_KEY");
+    }
+
+    let raw_tcb_info_json = unsafe {
+        let slice = core::slice::from_raw_parts(
+            quote_collateral.tcb_info as *const u8,
+            (quote_collateral.tcb_info_size - 1) as usize // Trim '\0'
+        );
+
+        core::str::from_utf8(slice).expect("Collateral TCB info should an UTF-8 string")
+    };
+    let tcb_info = tcb::TCBInfo::from_json_str(raw_tcb_info_json).unwrap();
+
+    // Get earliest & latest issue date and expiration date comparing all collaterals
+    // TODO: this from `qve_get_collateral_dates`
+    let raw_qe_identity_issuer_chain = unsafe {
+        let slice = core::slice::from_raw_parts(
+            quote_collateral.qe_identity_issuer_chain as *const u8,
+            (quote_collateral.qe_identity_issuer_chain_size - 1) as usize // trim last '\0'
+        );
+
+        core::str::from_utf8(slice).expect("Collateral QE identity issuer chain should an UTF-8 string")
+    };
+    let raw_qe_identity_issuer_chain = pem::parse_many(raw_qe_identity_issuer_chain).unwrap();
+    let qe_identity_issuer_chain: Vec<x509_cert::Certificate> = raw_qe_identity_issuer_chain.iter().map(move |pem| x509_cert::Certificate::from_der(&pem.contents).unwrap()).collect();
+    println!("{:?}", qe_identity_issuer_chain);
+
+    let raw_tcb_info_issuer_chain = unsafe {
+        let slice = core::slice::from_raw_parts(
+            quote_collateral.tcb_info_issuer_chain as *const u8,
+            (quote_collateral.tcb_info_issuer_chain_size - 1) as usize, // trim last '\0'
+        );
+
+        core::str::from_utf8(slice).expect("Collateral TCB info issuer chain should an UTF-8 string")
+    };
+    let raw_tcb_info_issuer_chain = pem::parse_many(raw_tcb_info_issuer_chain).unwrap();
+    let tcb_info_issuer_chain: Vec<x509_cert::Certificate> =
+        raw_tcb_info_issuer_chain.iter().map(move |pem| x509_cert::Certificate::from_der(&pem.contents).unwrap()).collect();
+    println!("{:?}", tcb_info_issuer_chain);
+
+    let raw_pck_crl_issuer_chain = unsafe {
+        let slice = core::slice::from_raw_parts(
+            quote_collateral.pck_crl_issuer_chain as *const u8,
+            (quote_collateral.pck_crl_issuer_chain_size - 1) as usize // trim last '\0'
+        );
+
+        core::str::from_utf8(slice).expect("Collateral PCK issuer chain should an UTF-8 string")
+    };
+    let raw_pck_crl_issuer_chain = pem::parse_many(raw_pck_crl_issuer_chain).unwrap();
+    let mut pck_crl_issuer_chain: Vec<x509_cert::Certificate> = raw_pck_crl_issuer_chain.iter().map(move |pem| x509_cert::Certificate::from_der(&pem.contents).unwrap()).collect();
+    println!("{:?}", pck_crl_issuer_chain);
+
+    let raw_qe_identity_json = unsafe {
+        let slice = core::slice::from_raw_parts(
+            quote_collateral.qe_identity as *const u8,
+            (quote_collateral.qe_identity_size - 1) as usize // Trim '\0'
+        );
+
+        core::str::from_utf8(slice).expect("Collateral QE Identity should an UTF-8 string")
+    };
+    let qe_identity = qe_identity::EnclaveIdentity::from_json_str(raw_qe_identity_json).unwrap();
+
+    // TODO:
+    // pckparser::CrlStore root_ca_crl;
+    // if (root_ca_crl.parse(crls[0]) != true) {
+    //     ret = SGX_QL_CRL_UNSUPPORTED_FORMAT;
+    //     break;
+    // }
+    //
+    // pckparser::CrlStore pck_crl;
+    // if (pck_crl.parse(crls[1]) != true) {
+    //     ret = SGX_QL_CRL_UNSUPPORTED_FORMAT;
+    //     break;
+    // }
+    //
+    // CertificateChain pck_crl_issuer_chain;
+    // if (pck_crl_issuer_chain.parse((reinterpret_cast<const char*>(p_quote_collateral->pck_crl_issuer_chain))) != STATUS_OK) {
+    //     ret = SGX_QL_PCK_CERT_CHAIN_ERROR;
+    //     break;
+    // }
+
+    // let time = pck_crl_issuer_chain.iter().map(|cert| cert.tbs_certificate.validity.not_before.to_unix_duration()).min().unwrap();
+    let earliest_issue_dates = [
+        root_ca_crl.tbs_cert_list.this_update.to_unix_duration(), // TODO: earliest_issue[0] = root_ca_crl.getValidity().notBeforeTime
+        pck_crl.tbs_cert_list.this_update.to_unix_duration(), // TODO: pck_crl.getValidity().notBeforeTime
+        pck_crl_issuer_chain.iter().map(|cert| cert.tbs_certificate.validity.not_before.to_unix_duration()).min().unwrap(),
+        cert_chain.iter().map(|cert| cert.tbs_certificate.validity.not_before.to_unix_duration()).min().unwrap(),
+        tcb_info_issuer_chain.iter().map(|cert| cert.tbs_certificate.validity.not_before.to_unix_duration()).min().unwrap(),
+        qe_identity_issuer_chain.iter().map(|cert| cert.tbs_certificate.validity.not_before.to_unix_duration()).min().unwrap(),
+        core::time::Duration::new(tcb_info.issue_date.timestamp() as u64, 0),
+        core::time::Duration::new(qe_identity.issue_date.timestamp() as u64, 0)
+    ];
+    let earliest_issue = earliest_issue_dates.iter().min().unwrap().clone();
+    println!("earliest_issue_dates:");
+    for date in earliest_issue_dates {
+        println!("{:?} {}", date, chrono::Utc.timestamp(date.as_secs() as i64, 0))
+    }
+    println!("Earliest issue: {}", chrono::Utc.timestamp(earliest_issue.clone().as_secs() as i64, 0));
+
+    let earliest_expiration_dates = [
+        root_ca_crl.tbs_cert_list.next_update.unwrap().to_unix_duration(), // TODO: root_ca_crl.getValidity().notAfterTime
+        pck_crl.tbs_cert_list.next_update.unwrap().to_unix_duration(), // TODO: pck_crl.getValidity().notBeforeTime
+        pck_crl_issuer_chain.iter().map(|cert| cert.tbs_certificate.validity.not_after.to_unix_duration()).min().unwrap(),
+        cert_chain.iter().map(|cert| cert.tbs_certificate.validity.not_after.to_unix_duration()).min().unwrap(),
+        tcb_info_issuer_chain.iter().map(|cert| cert.tbs_certificate.validity.not_after.to_unix_duration()).min().unwrap(),
+        qe_identity_issuer_chain.iter().map(|cert| cert.tbs_certificate.validity.not_after.to_unix_duration()).min().unwrap(),
+        core::time::Duration::new(tcb_info.next_update.timestamp() as u64, 0),
+        core::time::Duration::new(qe_identity.next_update.timestamp() as u64, 0)
+    ];
+    let earliest_expiration = earliest_expiration_dates.iter().min().unwrap().clone();
+    println!("earliest_expiration_dates:");
+    for date in earliest_expiration_dates {
+        println!("{:?} {}", date, chrono::Utc.timestamp(date.as_secs() as i64, 0))
+    }
+    println!("Earliest expiration: {}", chrono::Utc.timestamp(earliest_expiration.clone().as_secs() as i64, 0));
+
+    let latest_issue_dates = [
+        root_ca_crl.tbs_cert_list.this_update.to_unix_duration(), // TODO: earliest_issue[0] = root_ca_crl.getValidity().notBeforeTime
+        pck_crl.tbs_cert_list.this_update.to_unix_duration(), // TODO: pck_crl.getValidity().notBeforeTime
+        pck_crl_issuer_chain.iter().map(|cert| cert.tbs_certificate.validity.not_after.to_unix_duration()).max().unwrap(),
+        cert_chain.iter().map(|cert| cert.tbs_certificate.validity.not_after.to_unix_duration()).max().unwrap(),
+        tcb_info_issuer_chain.iter().map(|cert| cert.tbs_certificate.validity.not_after.to_unix_duration()).max().unwrap(),
+        qe_identity_issuer_chain.iter().map(|cert| cert.tbs_certificate.validity.not_after.to_unix_duration()).max().unwrap(),
+        core::time::Duration::new(tcb_info.issue_date.timestamp() as u64, 0),
+        core::time::Duration::new(qe_identity.issue_date.timestamp() as u64, 0)
+    ];
+    let latest_issue = latest_issue_dates.iter().max().unwrap().clone();
+    println!("latest_issue_dates:");
+    for date in latest_issue_dates {
+        println!("{:?} {}", date, chrono::Utc.timestamp(date.as_secs() as i64, 0))
+    }
+    println!("Latest issue: {}", chrono::Utc.timestamp(latest_issue.clone().as_secs() as i64, 0));
+
+    let latest_expiration_dates = [
+        root_ca_crl.tbs_cert_list.next_update.unwrap().to_unix_duration(), // TODO: root_ca_crl.getValidity().notAfterTime
+        pck_crl.tbs_cert_list.next_update.unwrap().to_unix_duration(), // TODO: pck_crl.getValidity().notBeforeTime
+        pck_crl_issuer_chain.iter().map(|cert| cert.tbs_certificate.validity.not_after.to_unix_duration()).max().unwrap(),
+        cert_chain.iter().map(|cert| cert.tbs_certificate.validity.not_after.to_unix_duration()).max().unwrap(),
+        tcb_info_issuer_chain.iter().map(|cert| cert.tbs_certificate.validity.not_after.to_unix_duration()).max().unwrap(),
+        qe_identity_issuer_chain.iter().map(|cert| cert.tbs_certificate.validity.not_after.to_unix_duration()).max().unwrap(),
+        core::time::Duration::new(tcb_info.next_update.second() as u64, tcb_info.next_update.nanosecond()),
+        core::time::Duration::new(qe_identity.next_update.second() as u64, qe_identity.next_update.nanosecond())
+    ];
+    let latest_expiration = latest_expiration_dates.iter().max().unwrap().clone();
+    for date in latest_expiration_dates {
+        println!("{:?} {}", date, chrono::Utc.timestamp(date.as_secs() as i64, 0))
+    }
+    println!("Latest expiration: {}", chrono::Utc.timestamp(latest_expiration.clone().as_secs() as i64, 0));
+
+    //parse and verify PCK certificate chain
+    // if (earliest_expiration_date <= expiration_check_date) {
+    //     *p_collateral_expiration_status = 1;
+    // }
+    // else {
+    //     *p_collateral_expiration_status = 0;
+    // }
+    // TODO: expiration_check_timestamp can be a duration
+    println!("Earliest expiration: {}", chrono::Utc.timestamp(earliest_expiration.clone().as_secs() as i64, 0));
+    println!("Expiration: {}", chrono::Utc.timestamp(expiration_check_timestamp as i64, 0));
+    if earliest_expiration.as_secs() <= expiration_check_timestamp {
+        println!("Expired")
+    }
+
+    //TODO: parse and verify TCB info
+    // SGXDataCenterAttestationPrimitives/QuoteVerification/QVL/Src/AttestationLibrary/src/QuoteVerification.cpp
+    // sgxAttestationVerifyTCBInfo
+    // SGXDataCenterAttestationPrimitives/QuoteVerification/QVL/Src/AttestationLibrary/src/Verifiers/TCBInfoVerifier.cpp
+    // Status TCBInfoVerifier::verify
+    // let cert = webpki::EndEntityCert::try_from(raw_signing_cert).unwrap();
+
+
+    //TODO: parse and verify QE identity
+    // SGXDataCenterAttestationPrimitives/QuoteVerification/QVL/Src/AttestationLibrary/src/QuoteVerification.cpp
+    // sgxAttestationVerifyEnclaveIdentity
+    // SGXDataCenterAttestationPrimitives/QuoteVerification/QVL/Src/AttestationLibrary/src/Verifiers/EnclaveIdentityVerifier.cpp
+    // Status EnclaveIdentityVerifier::verify
+
+    //TODO: parse and verify the quote, update verification results
+    // SGXDataCenterAttestationPrimitives/QuoteVerification/QVL/Src/AttestationLibrary/src/QuoteVerification.cpp
+    // sgxAttestationVerifyQuote
+    // SGXDataCenterAttestationPrimitives/QuoteVerification/QVL/Src/AttestationLibrary/src/Verifiers/QuoteVerifier.cpp
+    // Status QuoteVerifier::verify
 
     qvl::quote3_error_t::SGX_QL_SUCCESS
 }
