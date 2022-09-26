@@ -15,4 +15,4 @@ make run
 
 ## Sample
 
-<doc/output.sample>
+[Sample output](doc/output.sample)
