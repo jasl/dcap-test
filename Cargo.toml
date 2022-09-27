@@ -11,7 +11,6 @@ byteorder = { version = "1", default-features = false }
 chrono = { version = "0.4.22", default-features = false, features = ["alloc", "serde"] }
 serde = { version = "1.0.144", default-features = false, features = ["alloc", "derive"] }
 serde_json = { version = "1.0.85", default-features = false, features = ["alloc"] }
-sgx-dcap-quoteverify-rs = { path = "vendor/sgx-dcap-quoteverify-rs" }
 x509-cert = { version = "0.1.0", default-features = false, features = ["alloc", "pem"] }
 der = { version = "0.6.0", default-features = false, features = ["alloc", "pem"] }
 ecdsa = { version = "0.14.7", default-features = false, features = ["alloc", "pem"] }

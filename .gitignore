@@ -11,10 +11,11 @@
 /prebuilt_patched_lib/**
 !/prebuilt_patched_lib/.keep
 
-/gramine-build/*.token
-/gramine-build/*.sig
-/gramine-build/*.manifest.sgx
-/gramine-build/*.manifest
-
-/gramine-build/dcap-test.o
-/gramine-build/dcap-test
+/generation/bin/**
+!/generation/bin/.keep
+/generation/gramine-build/*.token
+/generation/gramine-build/*.sig
+/generation/gramine-build/*.manifest.sgx
+/generation/gramine-build/*.manifest
+/generation/gramine-build/dcap-generation-test.o
+/generation/gramine-build/dcap-generation-test

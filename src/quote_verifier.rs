@@ -1,7 +1,6 @@
 use std::panic;
 use serde_json::Value::String;
-use sgx_dcap_quoteverify_rs as qvl;
-use crate::{qe_identity, Quote, quote, tcb};
+use crate::{qe_identity, Quote, quote, QuoteCollateral, tcb};
 use der::{Decode, Enumerated, Error, ErrorKind, Sequence};
 
 use chrono::{DateTime, FixedOffset, Timelike, TimeZone};
@@ -98,21 +97,21 @@ const INTEL_ROOT_PUB_KEY: [u8; 65] = [
 ///
 pub fn sgx_qv_verify_quote(
     quote: &[u8],
-    quote_collateral: &qvl::sgx_ql_qve_collateral_t,
+    quote_collateral: QuoteCollateral,
     expiration_check_timestamp: u64,
-) -> qvl::quote3_error_t {
+) {
     // https://github.com/intel/SGXDataCenterAttestationPrimitives/blob/master/QuoteVerification/dcap_quoteverify/sgx_dcap_quoteverify.cpp#L459
 
     if quote.len() == 0 {
-        return qvl::quote3_error_t::SGX_QL_ERROR_INVALID_PARAMETER
+        panic!("qvl::quote3_error_t::SGX_QL_ERROR_INVALID_PARAMETER")
     } else if expiration_check_timestamp == 0 {
-        return qvl::quote3_error_t::SGX_QL_ERROR_INVALID_PARAMETER
+        panic!("qvl::quote3_error_t::SGX_QL_ERROR_INVALID_PARAMETER")
     }
 
     let tee_type = quote_collateral.tee_type;
     if tee_type != 0 {
         // TODO: 0 SGX 1 TDX 2 UNKNOWN, Only support SGX for now
-        return qvl::quote3_error_t::SGX_QL_ERROR_INVALID_PARAMETER
+        panic!("qvl::quote3_error_t::SGX_QL_ERROR_INVALID_PARAMETER")
     }
 
     // TODO: verify supplemental data, ref tee_get_verification_supplemental_data_size
@@ -143,13 +142,14 @@ pub fn sgx_qv_verify_quote(
     // TODO: Check collateral version
     // TODO: Validate parameters
 
-    let version = unsafe { quote_collateral.__bindgen_anon_1.version };
-    if version != QVE_COLLATERAL_VERSION1 &&
-        version != QVE_COLLATERAL_VERSION3 &&
-        version != QVE_COLLATERAL_VERSION31 &&
-        version != QVE_COLLATERAL_VERSION4 {
-        return qvl::quote3_error_t::SGX_QL_COLLATERAL_VERSION_NOT_SUPPORTED;
-    }
+    // TODO:
+    // let version = quote_collateral.major_version;
+    // if version != QVE_COLLATERAL_VERSION1 &&
+    //     version != QVE_COLLATERAL_VERSION3 &&
+    //     version != QVE_COLLATERAL_VERSION31 &&
+    //     version != QVE_COLLATERAL_VERSION4 {
+    //     return qvl::quote3_error_t::SGX_QL_COLLATERAL_VERSION_NOT_SUPPORTED;
+    // }
 
     let quote = Quote::parse(quote).unwrap();
     let certification_data = match quote.signed_data {
@@ -159,7 +159,7 @@ pub fn sgx_qv_verify_quote(
         _ => None
     };
     if certification_data.is_none() {
-        return qvl::quote3_error_t::SGX_QL_ERROR_INVALID_PARAMETER
+        panic!("qvl::quote3_error_t::SGX_QL_ERROR_INVALID_PARAMETER")
     }
     let certification_data = certification_data.unwrap();
     println!("certificate: {}", core::str::from_utf8(&certification_data.data.clone()).unwrap());
@@ -172,26 +172,12 @@ pub fn sgx_qv_verify_quote(
     println!("{:?}", cert_chain);
 
     // TODO: Check crl format
-    let raw_root_ca_crl = unsafe {
-        let slice = core::slice::from_raw_parts(
-            quote_collateral.root_ca_crl as *const u8,
-            (quote_collateral.root_ca_crl_size - 1) as usize // trim the last '\0' terminator
-        );
-
-        slice.to_vec()
-    };
+    let raw_root_ca_crl = quote_collateral.root_ca_crl;
     // the doc said Version 3 is base16 der, but actually is binary der
     let root_ca_crl = x509_cert::crl::CertificateList::from_der(&raw_root_ca_crl).unwrap();
     println!("{:?}", root_ca_crl);
 
-    let raw_pck_crl = unsafe {
-        let slice = core::slice::from_raw_parts(
-            quote_collateral.pck_crl as *const u8,
-            (quote_collateral.pck_crl_size - 1) as usize // trim the last '\0' terminator
-        );
-
-        slice.to_vec()
-    };
+    let raw_pck_crl = quote_collateral.pck_crl;
     let pck_crl = x509_cert::crl::CertificateList::from_der(&raw_pck_crl).unwrap();
     println!("{:?}", pck_crl);
 
@@ -204,64 +190,29 @@ pub fn sgx_qv_verify_quote(
         panic!("root_pub_key_from_cert != INTEL_ROOT_PUB_KEY");
     }
 
-    let raw_tcb_info_json = unsafe {
-        let slice = core::slice::from_raw_parts(
-            quote_collateral.tcb_info as *const u8,
-            (quote_collateral.tcb_info_size - 1) as usize // Trim '\0'
-        );
-
-        core::str::from_utf8(slice).expect("Collateral TCB info should an UTF-8 string")
-    };
-    let tcb_info = tcb::TCBInfo::from_json_str(raw_tcb_info_json).unwrap();
+    let raw_tcb_info_json = quote_collateral.tcb_info;
+    let tcb_info = tcb::TCBInfo::from_json_str(&raw_tcb_info_json).unwrap();
 
     // Get earliest & latest issue date and expiration date comparing all collaterals
     // TODO: this from `qve_get_collateral_dates`
-    let raw_qe_identity_issuer_chain = unsafe {
-        let slice = core::slice::from_raw_parts(
-            quote_collateral.qe_identity_issuer_chain as *const u8,
-            (quote_collateral.qe_identity_issuer_chain_size - 1) as usize // trim last '\0'
-        );
-
-        core::str::from_utf8(slice).expect("Collateral QE identity issuer chain should an UTF-8 string")
-    };
+    let raw_qe_identity_issuer_chain = quote_collateral.qe_identity_issuer_chain;
     let raw_qe_identity_issuer_chain = pem::parse_many(raw_qe_identity_issuer_chain).unwrap();
     let qe_identity_issuer_chain: Vec<x509_cert::Certificate> = raw_qe_identity_issuer_chain.iter().map(move |pem| x509_cert::Certificate::from_der(&pem.contents).unwrap()).collect();
     println!("{:?}", qe_identity_issuer_chain);
 
-    let raw_tcb_info_issuer_chain = unsafe {
-        let slice = core::slice::from_raw_parts(
-            quote_collateral.tcb_info_issuer_chain as *const u8,
-            (quote_collateral.tcb_info_issuer_chain_size - 1) as usize, // trim last '\0'
-        );
-
-        core::str::from_utf8(slice).expect("Collateral TCB info issuer chain should an UTF-8 string")
-    };
+    let raw_tcb_info_issuer_chain = quote_collateral.tcb_info_issuer_chain;
     let raw_tcb_info_issuer_chain = pem::parse_many(raw_tcb_info_issuer_chain).unwrap();
     let tcb_info_issuer_chain: Vec<x509_cert::Certificate> =
         raw_tcb_info_issuer_chain.iter().map(move |pem| x509_cert::Certificate::from_der(&pem.contents).unwrap()).collect();
     println!("{:?}", tcb_info_issuer_chain);
 
-    let raw_pck_crl_issuer_chain = unsafe {
-        let slice = core::slice::from_raw_parts(
-            quote_collateral.pck_crl_issuer_chain as *const u8,
-            (quote_collateral.pck_crl_issuer_chain_size - 1) as usize // trim last '\0'
-        );
-
-        core::str::from_utf8(slice).expect("Collateral PCK issuer chain should an UTF-8 string")
-    };
+    let raw_pck_crl_issuer_chain = quote_collateral.pck_crl_issuer_chain;
     let raw_pck_crl_issuer_chain = pem::parse_many(raw_pck_crl_issuer_chain).unwrap();
     let mut pck_crl_issuer_chain: Vec<x509_cert::Certificate> = raw_pck_crl_issuer_chain.iter().map(move |pem| x509_cert::Certificate::from_der(&pem.contents).unwrap()).collect();
     println!("{:?}", pck_crl_issuer_chain);
 
-    let raw_qe_identity_json = unsafe {
-        let slice = core::slice::from_raw_parts(
-            quote_collateral.qe_identity as *const u8,
-            (quote_collateral.qe_identity_size - 1) as usize // Trim '\0'
-        );
-
-        core::str::from_utf8(slice).expect("Collateral QE Identity should an UTF-8 string")
-    };
-    let qe_identity = qe_identity::EnclaveIdentity::from_json_str(raw_qe_identity_json).unwrap();
+    let raw_qe_identity_json = quote_collateral.qe_identity;
+    let qe_identity = qe_identity::EnclaveIdentity::from_json_str(&raw_qe_identity_json).unwrap();
 
     // TODO:
     // pckparser::CrlStore root_ca_crl;
@@ -341,8 +292,8 @@ pub fn sgx_qv_verify_quote(
         cert_chain.iter().map(|cert| cert.tbs_certificate.validity.not_after.to_unix_duration()).max().unwrap(),
         tcb_info_issuer_chain.iter().map(|cert| cert.tbs_certificate.validity.not_after.to_unix_duration()).max().unwrap(),
         qe_identity_issuer_chain.iter().map(|cert| cert.tbs_certificate.validity.not_after.to_unix_duration()).max().unwrap(),
-        core::time::Duration::new(tcb_info.next_update.second() as u64, tcb_info.next_update.nanosecond()),
-        core::time::Duration::new(qe_identity.next_update.second() as u64, qe_identity.next_update.nanosecond())
+        core::time::Duration::new(tcb_info.next_update.timestamp() as u64, 0),
+        core::time::Duration::new(qe_identity.next_update.timestamp() as u64, 0)
     ];
     let latest_expiration = latest_expiration_dates.iter().max().unwrap().clone();
     for date in latest_expiration_dates {
@@ -383,6 +334,4 @@ pub fn sgx_qv_verify_quote(
     // sgxAttestationVerifyQuote
     // SGXDataCenterAttestationPrimitives/QuoteVerification/QVL/Src/AttestationLibrary/src/Verifiers/QuoteVerifier.cpp
     // Status QuoteVerifier::verify
-
-    qvl::quote3_error_t::SGX_QL_SUCCESS
 }

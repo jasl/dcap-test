@@ -10,13 +10,13 @@ GRAMINE_LOG_LEVEL = error
 
 USE_MUSL ?= 0
 
-BIN_NAME = dcap-test
+BIN_NAME = dcap-generation-test
 
 DATA_DIRS = data/protected_files \
             data/storage_files
 
 # TODO: TMP
-DCAP_LIB_DIR ?= ../SGXDataCenterAttestationPrimitives/QuoteGeneration/build/linux
+DCAP_LIB_DIR ?= ../../SGXDataCenterAttestationPrimitives/QuoteGeneration/build/linux
 
 GRAMINE_DIR ?= $(shell ./gramine-dir libs)
 GRAMINE_LIBOS ?= $(shell ./gramine-dir libos)

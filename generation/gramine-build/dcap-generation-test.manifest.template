@@ -1,10 +1,10 @@
 [libos]
-entrypoint = "dcap-test"
+entrypoint = "dcap-generation-test"
 
 [loader]
 entrypoint = "file:{{ libos }}"
 log_level = "{{ log_level }}"
-argv0_override = "dcap-test"
+argv0_override = "dcap-generation-test"
 insecure__use_cmdline_argv = true
 
 [sys]
@@ -59,7 +59,7 @@ trusted_files = [
   "file:{{ libos }}",
   "file:{{ libdir }}",
   "file:{{ arch_libdir }}",
-  "file:dcap-test",
+  "file:dcap-generation-test",
 ]
 
 allowed_files = [

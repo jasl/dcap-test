@@ -2,11 +2,19 @@
 
 ## Build
 
+
+Generation (Require HW SGX & HW)
+
 ```
 cd SGXDataCenterAttestationPrimitives/QuoteVerification/dcap_quoteverify/linux
 make
 cd ../../../../gramine-build
 make run
+```
+
+Verification
+```
+cargo run
 ```
 
 ## References
