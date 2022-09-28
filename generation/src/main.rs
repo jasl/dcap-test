@@ -110,51 +110,51 @@ fn main() {
     };
     println!("{}", qe_identity);
 
-    fs::create_dir_all("/data/sample/quote_collateral").unwrap();
+    fs::create_dir_all("/data/storage_files/quote_collateral").unwrap();
 
     fs::write(
-        "/data/sample/quote",
+        "/data/storage_files/quote",
         quote
     ).unwrap();
 
     // fs::write(
-    //     "/data/sample/quote_collateral/major_version",
+    //     "/data/storage_files/quote_collateral/major_version",
     //     major_version
     // ).unwrap();
     // fs::write(
-    //     "/data/sample/quote_collateral/major_version",
+    //     "/data/storage_files/quote_collateral/major_version",
     //     minor_version
     // ).unwrap();
     // fs::write(
-    //     "/data/sample/quote_collateral/tee_type",
+    //     "/data/storage_files/quote_collateral/tee_type",
     //     tee_type
     // ).unwrap();
     fs::write(
-        "/data/sample/quote_collateral/pck_crl_issuer_chain",
+        "/data/storage_files/quote_collateral/pck_crl_issuer_chain",
         pck_crl_issuer_chain
     ).unwrap();
     fs::write(
-        "/data/sample/quote_collateral/root_ca_crl",
+        "/data/storage_files/quote_collateral/root_ca_crl",
         root_ca_crl
     ).unwrap();
     fs::write(
-        "/data/sample/quote_collateral/pck_crl",
+        "/data/storage_files/quote_collateral/pck_crl",
         pck_crl
     ).unwrap();
     fs::write(
-        "/data/sample/quote_collateral/tcb_info_issuer_chain",
+        "/data/storage_files/quote_collateral/tcb_info_issuer_chain",
         tcb_info_issuer_chain
     ).unwrap();
     fs::write(
-        "/data/sample/quote_collateral/tcb_info",
+        "/data/storage_files/quote_collateral/tcb_info",
         tcb_info
     ).unwrap();
     fs::write(
-        "/data/sample/quote_collateral/qe_identity_issuer_chain",
+        "/data/storage_files/quote_collateral/qe_identity_issuer_chain",
         qe_identity_issuer_chain
     ).unwrap();
     fs::write(
-        "/data/sample/quote_collateral/qe_identity",
+        "/data/storage_files/quote_collateral/qe_identity",
         qe_identity
     ).unwrap();
 

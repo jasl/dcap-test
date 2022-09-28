@@ -28,6 +28,11 @@ path = "/lib/x86_64-linux-gnu"
 uri = "file:{{ arch_libdir }}"
 
 [[fs.mounts]]
+type = "chroot"
+path = "/etc"
+uri = "file:/etc"
+
+[[fs.mounts]]
 type = "encrypted"
 key_name = "_sgx_mrenclave"
 path = "/data/protected_files"
@@ -38,22 +43,16 @@ type = "chroot"
 path = "/data/storage_files"
 uri = "file:{{ storage_dir }}"
 
-[[fs.mounts]]
-type = "chroot"
-path = "/etc"
-uri = "file:/etc"
-
 [sgx]
 debug = false
 nonpie_binary = true
 enclave_size = "2G"
 thread_num = 32
-remote_attestation = true
-# remote_attestation = "{{ ra_type }}"
-# {% if ra_type == "epid" %}
-# ra_client_spid = "{{ ra_client_spid }}"
-# ra_client_linkable = {{ 'true' if ra_client_linkable == '1' else 'false' }}
-# {% endif %}
+remote_attestation = "{{ ra_type }}"
+{% if ra_type == "epid" %}
+ra_client_spid = "{{ ra_client_spid }}"
+ra_client_linkable = {{ 'true' if ra_client_linkable == '1' else 'false' }}
+{% endif %}
 
 trusted_files = [
   "file:{{ libos }}",
