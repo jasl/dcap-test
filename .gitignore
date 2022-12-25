@@ -11,6 +11,7 @@
 /prebuilt_patched_lib/**
 !/prebuilt_patched_lib/.keep
 
+/generation/target
 /generation/bin/**
 !/generation/bin/.keep
 /generation/gramine-build/*.token

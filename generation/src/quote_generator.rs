@@ -1,13 +1,10 @@
 use sgx_dcap_quoteverify_rs as qvl;
-use std::{fs, ptr, time};
-
-const FMSPC_SIZE: usize = 6;
-const CA_SIZE: usize = 10;
+use std::{fs, time};
 
 pub struct QuoteBag {
     // TODO: Version of the bag
     pub quote: Vec<u8>,
-    pub quote_collateral: qvl::sgx_ql_qve_collateral_t,
+    pub quote_collateral: Vec<u8>,
 }
 
 pub fn create_quote_bag(data: &[u8]) -> QuoteBag {
@@ -16,52 +13,23 @@ pub fn create_quote_bag(data: &[u8]) -> QuoteBag {
     let quote = fs::read("/dev/attestation/quote").expect("Create quote error");
 
     println!("Quote hex:");
-    println!("0x{}", hex::encode_upper(quote.clone()));
+    println!("0x{}", hex::encode(quote.clone()));
 
-    let mut fmsp_from_quote: [u8; FMSPC_SIZE] = [0u8; FMSPC_SIZE];
-    let mut ca_from_quote: [u8; CA_SIZE] = [0u8; CA_SIZE];
-
-    let dcap_ret = qvl::qvl_get_fmspc_ca_from_quote(
-        &quote,
-        &mut fmsp_from_quote,
-        &mut ca_from_quote
-    );
-
-    if qvl::quote3_error_t::SGX_QL_SUCCESS == dcap_ret {
-        println!("Info: qvl_get_fmspc_ca_from_quote successfully returned.");
-    } else {
-        panic!("Error: qvl_get_fmspc_ca_from_quote failed: {:#04x}", dcap_ret as u32);
-    }
-
-    println!("FMSP hex:");
-    println!("0x{}", hex::encode_upper(fmsp_from_quote.clone()));
-    println!("CA hex:");
-    println!("0x{}", hex::encode_upper(ca_from_quote.clone()));
-
-    let mut p_quote_collateral: *mut qvl::sgx_ql_qve_collateral_t = ptr::null_mut();
-    let dcap_ret = qvl::sgx_dcap_retrieve_verification_collateral(
-        &fmsp_from_quote,
-        &ca_from_quote,
-        &mut p_quote_collateral as *mut *mut qvl::sgx_ql_qve_collateral_t
-    );
-
-    if qvl::quote3_error_t::SGX_QL_SUCCESS == dcap_ret {
-        println!("Info: sgx_dcap_retrieve_verification_collateral successfully returned.");
-    } else {
-        panic!("Error: sgx_dcap_retrieve_verification_collateral failed: {:#04x}", dcap_ret as u32);
-    }
-
-    let quote_collateral: &qvl::sgx_ql_qve_collateral_t = &unsafe { *p_quote_collateral };
+    let quote_collateral = match qvl::tee_qv_get_collateral(&quote) {
+        Ok(r) => r,
+        Err(e) => panic!("Error: tee_qv_get_collateral failed: {:#04x}", e as u32)
+    };
 
     // TODO: may requires to free collateral
 
     QuoteBag {
         quote,
-        quote_collateral: *quote_collateral
+        quote_collateral
     }
 }
 
-pub fn quote_verification(quote: Vec<u8>, quote_collateral: qvl::sgx_ql_qve_collateral_t) {
+#[allow(dead_code)]
+pub fn quote_verification(quote: &[u8], quote_collateral: &[u8]) {
     // set current time. This is only for sample purposes, in production mode a trusted time should be used.
     //
     let current_time: u64 = time::SystemTime::now().duration_since(time::SystemTime::UNIX_EPOCH).unwrap().as_secs().try_into().unwrap();
@@ -73,21 +41,20 @@ pub fn quote_verification(quote: Vec<u8>, quote_collateral: qvl::sgx_ql_qve_coll
     let mut quote_verification_result = qvl::sgx_ql_qv_result_t::SGX_QL_QV_RESULT_UNSPECIFIED;
     let mut collateral_expiration_status = 1u32;
 
-    let dcap_ret = qvl::sgx_qv_verify_quote(
+    match qvl::tee_verify_quote(
         &quote,
         Some(&quote_collateral),
-        current_time as i64, // TODO: WHY i64?
-        &mut collateral_expiration_status,
-        &mut quote_verification_result,
+        current_time as i64,
         None,
-        0,
-        None);
-    if qvl::quote3_error_t::SGX_QL_SUCCESS == dcap_ret {
-        println!("\tInfo: App: sgx_qv_verify_quote successfully returned.");
-    } else {
-        println!("\tError: App: sgx_qv_verify_quote failed: {:#04x}", dcap_ret as u32);
+        None,
+    ) {
+        Ok((colla_exp_stat, qv_result)) => {
+            collateral_expiration_status = colla_exp_stat;
+            quote_verification_result = qv_result;
+            println!("\tInfo: App: tee_verify_quote successfully returned.");
+        }
+        Err(e) => println!("\tError: App: tee_verify_quote failed: {:#04x}", e as u32),
     }
-
     // check verification result
 
     match quote_verification_result {
@@ -95,23 +62,24 @@ pub fn quote_verification(quote: Vec<u8>, quote_collateral: qvl::sgx_ql_qve_coll
             // check verification collateral expiration status
             // this value should be considered in your own attestation/verification policy
             //
-            if 0u32 == collateral_expiration_status {
+            if collateral_expiration_status == 0 {
                 println!("\tInfo: App: Verification completed successfully.");
             } else {
                 println!("\tWarning: App: Verification completed, but collateral is out of date based on 'expiration_check_date' you provided.");
             }
-        },
-        qvl::sgx_ql_qv_result_t::SGX_QL_QV_RESULT_CONFIG_NEEDED |
-        qvl::sgx_ql_qv_result_t::SGX_QL_QV_RESULT_OUT_OF_DATE |
-        qvl::sgx_ql_qv_result_t::SGX_QL_QV_RESULT_OUT_OF_DATE_CONFIG_NEEDED |
-        qvl::sgx_ql_qv_result_t::SGX_QL_QV_RESULT_SW_HARDENING_NEEDED |
-        qvl::sgx_ql_qv_result_t::SGX_QL_QV_RESULT_CONFIG_AND_SW_HARDENING_NEEDED => {
+        }
+        qvl::sgx_ql_qv_result_t::SGX_QL_QV_RESULT_CONFIG_NEEDED
+        | qvl::sgx_ql_qv_result_t::SGX_QL_QV_RESULT_OUT_OF_DATE
+        | qvl::sgx_ql_qv_result_t::SGX_QL_QV_RESULT_OUT_OF_DATE_CONFIG_NEEDED
+        | qvl::sgx_ql_qv_result_t::SGX_QL_QV_RESULT_SW_HARDENING_NEEDED
+        | qvl::sgx_ql_qv_result_t::SGX_QL_QV_RESULT_CONFIG_AND_SW_HARDENING_NEEDED => {
             println!("\tWarning: App: Verification completed with Non-terminal result: {:x}", quote_verification_result as u32);
-        },
-        qvl::sgx_ql_qv_result_t::SGX_QL_QV_RESULT_INVALID_SIGNATURE |
-        qvl::sgx_ql_qv_result_t::SGX_QL_QV_RESULT_REVOKED |
-        qvl::sgx_ql_qv_result_t::SGX_QL_QV_RESULT_UNSPECIFIED | _ => {
+        }
+        qvl::sgx_ql_qv_result_t::SGX_QL_QV_RESULT_INVALID_SIGNATURE
+        | qvl::sgx_ql_qv_result_t::SGX_QL_QV_RESULT_REVOKED
+        | qvl::sgx_ql_qv_result_t::SGX_QL_QV_RESULT_UNSPECIFIED
+        | _ => {
             println!("\tError: App: Verification completed with Terminal result: {:x}", quote_verification_result as u32);
-        },
+        }
     }
 }
