@@ -344,11 +344,14 @@ pub fn tee_qv_get_collateral(quote: &[u8]) -> Result<Vec<u8>, quote3_error_t> {
             &mut buf_len,
         ) {
             quote3_error_t::SGX_QL_SUCCESS => {
-                let collateral = slice::from_raw_parts(buf, buf_len as usize).to_vec();
-                match qvl_sys::tee_qv_free_collateral(buf) {
-                    quote3_error_t::SGX_QL_SUCCESS => Ok(collateral),
-                    error_code => Err(error_code),
-                }
+                // let collateral = slice::from_raw_parts(buf, std::mem::size_of::<sgx_ql_qve_collateral_t>()).to_vec();
+                // match qvl_sys::tee_qv_free_collateral(buf) {
+                //     quote3_error_t::SGX_QL_SUCCESS => Ok(collateral),
+                //     error_code => Err(error_code),
+                // }
+                Ok(
+                    slice::from_raw_parts(buf, std::mem::size_of::<sgx_ql_qve_collateral_t>()).to_vec()
+                )
             }
             error_code => Err(error_code),
         }
